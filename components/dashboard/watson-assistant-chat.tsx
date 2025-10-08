@@ -44,6 +44,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Create Watson Assistant session
@@ -89,8 +90,42 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Use a small delay to ensure the DOM has updated
+    const timer = setTimeout(() => {
+      // Try scrollIntoView first
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'end',
+          inline: 'nearest'
+        });
+      }
+
+      // Fallback: manually scroll the container
+      if (scrollContainerRef.current) {
+        const scrollElement = scrollContainerRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight;
+        }
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [messages]);
+
+  const scrollToBottom = () => {
+    // Force scroll to bottom immediately
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+
+    if (scrollContainerRef.current) {
+      const scrollElement = scrollContainerRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -105,6 +140,9 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+
+    // Scroll to bottom after adding user message
+    setTimeout(scrollToBottom, 50);
 
     try {
       const response = await fetch('/api/watson/assistant', {
@@ -138,6 +176,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
         };
 
         setMessages(prev => [...prev, assistantMessage]);
+        setTimeout(scrollToBottom, 50);
       } else {
         throw new Error('Invalid response from Watson');
       }
@@ -152,6 +191,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
       };
 
       setMessages(prev => [...prev, errorMessage]);
+      setTimeout(scrollToBottom, 50);
     } finally {
       setIsLoading(false);
     }
@@ -185,6 +225,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
         };
 
         setMessages(prev => [...prev, assistantMessage]);
+        setTimeout(scrollToBottom, 50);
       }
     } catch (error) {
       console.error('Error executing quick action:', error);
@@ -202,6 +243,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
         timestamp: new Date(),
       }
     ]);
+    setTimeout(scrollToBottom, 50);
   };
 
   if (isMinimized) {
@@ -226,8 +268,8 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
   }
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-600 text-white rounded-t-lg">
+    <Card className="flex flex-col h-full max-h-[600px]">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-600 text-white rounded-t-lg flex-shrink-0">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Bot className="w-5 h-5" />
           Watson Assistant
@@ -252,9 +294,9 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 p-0 flex flex-col">
+      <CardContent className="flex-1 p-0 flex flex-col min-h-0">
         {/* Quick Actions */}
-        <div className="p-3 bg-gray-50 border-b">
+        <div className="p-3 bg-gray-50 border-b flex-shrink-0">
           <div className="text-xs text-muted-foreground mb-2">Quick Actions:</div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -309,71 +351,75 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-3">
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`flex gap-2 max-w-[80%] ${
-                    message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                  }`}
-                >
-                  <div className="flex-shrink-0 mt-1">
-                    {message.role === 'user' ? (
-                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                        <User className="w-3 h-3 text-white" />
+        <div className="flex-1 min-h-0 relative">
+          <ScrollArea ref={scrollContainerRef} className="h-full">
+            <div className="p-3">
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`flex gap-2 max-w-[80%] ${
+                        message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                      }`}
+                    >
+                      <div className="flex-shrink-0 mt-1">
+                        {message.role === 'user' ? (
+                          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                            <User className="w-3 h-3 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center">
+                            <Bot className="w-3 h-3 text-white" />
+                          </div>
+                        )}
                       </div>
-                    ) : (
+                      <div
+                        className={`p-3 rounded-lg ${
+                          message.role === 'user'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-900'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                          }`}
+                        >
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="flex gap-2">
                       <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center">
                         <Bot className="w-3 h-3 text-white" />
                       </div>
-                    )}
-                  </div>
-                  <div
-                    className={`p-3 rounded-lg ${
-                      message.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                      }`}
-                    >
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="flex gap-2">
-                  <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center">
-                    <Bot className="w-3 h-3 text-white" />
-                  </div>
-                  <div className="bg-gray-100 p-3 rounded-lg">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      <div className="bg-gray-100 p-3 rounded-lg">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Input Area */}
-        <div className="p-3 border-t">
+        <div className="p-3 border-t flex-shrink-0 bg-white">
           <div className="flex gap-2 items-center">
             <Input
               value={inputValue}
