@@ -5,6 +5,7 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../'),
+    forceSwcTransforms: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -20,11 +21,7 @@ const nextConfig = {
   poweredByHeader: false,
   trailingSlash: false,
   generateBuildId: () => 'verdantaiq-v2',
-  // Disable static optimization for all pages to avoid React context errors
-  experimental: {
-    ...nextConfig.experimental,
-    forceSwcTransforms: true,
-  },
+  output: 'standalone',
 };
 
 module.exports = nextConfig;
