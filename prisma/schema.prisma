@@ -1,0 +1,460 @@
+// Peoria Sustainable Urban Agriculture Platform - Database Schema
+// Comprehensive schema for all platform modules
+
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/peoria_onticworks/app/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MANAGEMENT & AUTHENTICATION
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  ANALYST
+  VIEWER
+  MAINTENANCE
+}
+
+enum OrganizationType {
+  FARM
+  RESEARCH
+  CORPORATION
+  INDIVIDUAL
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String?
+  firstName     String?
+  lastName      String?
+  phone         String?
+  role          UserRole  @default(VIEWER)
+  organization  String?
+  orgType       OrganizationType? @default(INDIVIDUAL)
+  emailVerified DateTime?
+  image         String?
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  alerts        Alert[]
+  maintenanceLogs MaintenanceLog[]
+  
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// IOT DEVICES & SENSOR MANAGEMENT
+// ============================================================================
+
+enum DeviceType {
+  TEMPERATURE_SENSOR
+  MOISTURE_SENSOR
+  PH_SENSOR
+  VERMICULTURE_CONTROLLER
+  NUTRIENT_DISTRIBUTOR
+  ENVIRONMENTAL_MONITOR
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  ERROR
+}
+
+model Device {
+  id          String       @id @default(cuid())
+  name        String
+  deviceType  DeviceType
+  location    String?
+  macAddress  String       @unique
+  ipAddress   String?
+  status      DeviceStatus @default(ACTIVE)
+  firmware    String?
+  lastSeen    DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  sensorReadings SensorReading[]
+  alerts        Alert[]
+  
+  @@map("devices")
+}
+
+// ============================================================================
+// ENVIRONMENTAL MONITORING & SENSOR DATA
+// ============================================================================
+
+enum SensorType {
+  TEMPERATURE
+  MOISTURE
+  PH
+  HUMIDITY
+  LIGHT_INTENSITY
+  CO2_LEVEL
+  NITROGEN_LEVEL
+  PHOSPHORUS_LEVEL
+  POTASSIUM_LEVEL
+}
+
+model SensorReading {
+  id        String     @id @default(cuid())
+  deviceId  String
+  sensorType SensorType
+  value     Float
+  unit      String
+  location  String?
+  timestamp DateTime   @default(now())
+  
+  // Relations
+  device    Device     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  @@map("sensor_readings")
+}
+
+// ============================================================================
+// VERMICULTURE MANAGEMENT
+// ============================================================================
+
+enum VermicultureStatus {
+  OPTIMAL
+  NEEDS_ATTENTION
+  CRITICAL
+  MAINTENANCE
+}
+
+model VermicultureSystem {
+  id            String            @id @default(cuid())
+  name          String
+  location      String
+  capacity      Int               // in kg
+  currentLoad   Int               // in kg
+  temperature   Float?
+  moisture      Float?
+  ph            Float?
+  status        VermicultureStatus @default(OPTIMAL)
+  lastFeedTime  DateTime?
+  lastHarvestTime DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  productions   VermicultureProduction[]
+  maintenanceLogs MaintenanceLog[]
+  
+  @@map("vermiculture_systems")
+}
+
+model VermicultureProduction {
+  id              String             @id @default(cuid())
+  systemId        String
+  batchNumber     String             @unique
+  startDate       DateTime
+  expectedHarvest DateTime
+  actualHarvest   DateTime?
+  expectedYield   Float              // in kg
+  actualYield     Float?             // in kg
+  quality         String?            // Grade A, B, C
+  notes           String?
+  
+  // Relations
+  system          VermicultureSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  
+  @@map("vermiculture_productions")
+}
+
+// ============================================================================
+// PLANT HEALTH & PRODUCTION ANALYTICS
+// ============================================================================
+
+enum PlantStatus {
+  HEALTHY
+  STRESSED
+  DISEASED
+  RECOVERING
+}
+
+model PlantSystem {
+  id           String      @id @default(cuid())
+  name         String
+  cropType     String
+  plantingDate DateTime
+  location     String
+  area         Float       // in square meters
+  plantCount   Int?
+  status       PlantStatus @default(HEALTHY)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  healthRecords PlantHealth[]
+  yields       PlantYield[]
+  nutrients    NutrientApplication[]
+  
+  @@map("plant_systems")
+}
+
+model PlantHealth {
+  id             String      @id @default(cuid())
+  plantSystemId  String
+  healthScore    Float       // 0-100
+  diseaseLevel   Float?      // 0-100
+  pestLevel      Float?      // 0-100
+  notes          String?
+  recordedAt     DateTime    @default(now())
+  
+  // Relations
+  plantSystem    PlantSystem @relation(fields: [plantSystemId], references: [id], onDelete: Cascade)
+  
+  @@map("plant_health")
+}
+
+model PlantYield {
+  id             String      @id @default(cuid())
+  plantSystemId  String
+  harvestDate    DateTime
+  quantity       Float       // in kg
+  quality        String?     // Grade A, B, C
+  notes          String?
+  
+  // Relations
+  plantSystem    PlantSystem @relation(fields: [plantSystemId], references: [id], onDelete: Cascade)
+  
+  @@map("plant_yields")
+}
+
+// ============================================================================
+// NUTRIENT DISTRIBUTION MANAGEMENT
+// ============================================================================
+
+enum NutrientType {
+  NITROGEN
+  PHOSPHORUS
+  POTASSIUM
+  ORGANIC_COMPOST
+  LIQUID_FERTILIZER
+  VERMICULTURE_COMPOST
+}
+
+model NutrientApplication {
+  id             String       @id @default(cuid())
+  plantSystemId  String
+  nutrientType   NutrientType
+  quantity       Float        // in kg or liters
+  concentration  Float?       // percentage
+  applicationDate DateTime
+  method         String?      // spray, irrigation, manual
+  notes          String?
+  
+  // Relations
+  plantSystem    PlantSystem  @relation(fields: [plantSystemId], references: [id], onDelete: Cascade)
+  
+  @@map("nutrient_applications")
+}
+
+// ============================================================================
+// ALERT & NOTIFICATION SYSTEM
+// ============================================================================
+
+enum AlertType {
+  ENVIRONMENTAL
+  SYSTEM_ERROR
+  MAINTENANCE_DUE
+  THRESHOLD_EXCEEDED
+  DEVICE_OFFLINE
+  PRODUCTION_ISSUE
+  SECURITY
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  CLOSED
+}
+
+model Alert {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  alertType   AlertType
+  severity    AlertSeverity
+  status      AlertStatus   @default(OPEN)
+  deviceId    String?
+  assignedTo  String?
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  device      Device?       @relation(fields: [deviceId], references: [id])
+  assignedUser User?        @relation(fields: [assignedTo], references: [id])
+  
+  @@map("alerts")
+}
+
+// ============================================================================
+// PERFORMANCE MANAGEMENT & MAINTENANCE
+// ============================================================================
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  EMERGENCY
+  CALIBRATION
+  CLEANING
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model MaintenanceLog {
+  id               String            @id @default(cuid())
+  title            String
+  description      String?
+  maintenanceType  MaintenanceType
+  status           MaintenanceStatus @default(SCHEDULED)
+  scheduledDate    DateTime
+  completedDate    DateTime?
+  duration         Int?              // in minutes
+  cost             Float?
+  performedBy      String?
+  deviceId         String?
+  systemId         String?
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  performer        User?             @relation(fields: [performedBy], references: [id])
+  vermicultureSystem VermicultureSystem? @relation(fields: [systemId], references: [id])
+  
+  @@map("maintenance_logs")
+}
+
+// ============================================================================
+// TRAINING & DOCUMENTATION SYSTEM
+// ============================================================================
+
+enum ContentType {
+  VIDEO
+  DOCUMENT
+  INTERACTIVE_MODULE
+  CHECKLIST
+  PROCEDURE
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model TrainingContent {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  contentType ContentType
+  status      ContentStatus @default(DRAFT)
+  filePath    String?
+  duration    Int?          // in minutes for videos
+  difficulty  String?       // Beginner, Intermediate, Advanced
+  tags        String[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  completions TrainingCompletion[]
+  
+  @@map("training_content")
+}
+
+model TrainingCompletion {
+  id        String   @id @default(cuid())
+  userId    String
+  contentId String
+  completedAt DateTime @default(now())
+  score     Float?   // 0-100
+  
+  // Relations
+  content   TrainingContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, contentId])
+  @@map("training_completions")
+}
+
+// ============================================================================
+// SYSTEM CONFIGURATION & SETTINGS
+// ============================================================================
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  category    String?
+  updatedAt   DateTime @updatedAt
+  
+  @@map("system_config")
+}
