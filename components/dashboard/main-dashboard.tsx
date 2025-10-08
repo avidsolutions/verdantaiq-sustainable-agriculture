@@ -65,7 +65,7 @@ export function MainDashboard({ systems, alerts, aiInsights, workflows }: MainDa
       {/* Header with Watson Integration */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Peoria Agricultural Management</h1>
+          <h1 className="text-3xl font-bold">Ag Intelligence Dashboard</h1>
           <p className="text-muted-foreground">Powered by IBM Watson X</p>
         </div>
         <div className="flex gap-2">
