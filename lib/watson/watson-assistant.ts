@@ -362,5 +362,6 @@ class WatsonAssistantService {
       sessionId: 'mock_session'
     };
   }
+}
 
 export const watsonAssistant = new WatsonAssistantService();
