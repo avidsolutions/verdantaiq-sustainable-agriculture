@@ -24,6 +24,7 @@ interface Message {
   content: string;
   timestamp: Date;
   context?: any;
+  isTyping?: boolean;
 }
 
 interface WatsonAssistantChatProps {
@@ -42,6 +43,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [conversationContext, setConversationContext] = useState<any>({});
   const [isMinimized, setIsMinimized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -141,7 +143,16 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
     setInputValue('');
     setIsLoading(true);
 
-    // Scroll to bottom after adding user message
+    // Add typing indicator
+    const typingMessage: Message = {
+      id: `typing_${Date.now()}`,
+      role: 'assistant',
+      content: 'typing...',
+      timestamp: new Date(),
+      isTyping: true
+    };
+
+    setMessages(prev => [...prev, typingMessage]);
     setTimeout(scrollToBottom, 50);
 
     try {
@@ -155,6 +166,7 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
           userId: 'current_user',
           message: inputValue,
           context: {
+            ...conversationContext,
             session_id: sessionId,
             user_context: {
               current_system: 'sys_001',
@@ -167,30 +179,45 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
       const result = await response.json();
       
       if (result.success && result.data.output?.generic) {
-        const assistantMessage: Message = {
-          id: `assistant_${Date.now()}`,
-          role: 'assistant',
-          content: result.data.output.generic[0]?.text || 'I apologize, but I couldn\'t process your request. Please try again.',
-          timestamp: new Date(),
-          context: result.data.context
-        };
+        // Remove typing indicator and add real response
+        setMessages(prev => {
+          const withoutTyping = prev.filter(msg => !msg.isTyping);
+          const assistantMessage: Message = {
+            id: `assistant_${Date.now()}`,
+            role: 'assistant',
+            content: result.data.output.generic[0]?.text || 'I apologize, but I couldn\'t process your request. Please try again.',
+            timestamp: new Date(),
+            context: result.data.context
+          };
+          return [...withoutTyping, assistantMessage];
+        });
 
-        setMessages(prev => [...prev, assistantMessage]);
+        // Update conversation context for next message
+        if (result.data.context) {
+          setConversationContext(result.data.context);
+        }
+
         setTimeout(scrollToBottom, 50);
       } else {
+        // Remove typing indicator on error
+        setMessages(prev => prev.filter(msg => !msg.isTyping));
         throw new Error('Invalid response from Watson');
       }
     } catch (error) {
       console.error('Error sending message to Watson:', error);
-      
-      const errorMessage: Message = {
-        id: `error_${Date.now()}`,
-        role: 'assistant',
-        content: 'I\'m having trouble connecting right now. Please try again later or contact support if the issue persists.',
-        timestamp: new Date(),
-      };
 
-      setMessages(prev => [...prev, errorMessage]);
+      // Remove typing indicator and add error message
+      setMessages(prev => {
+        const withoutTyping = prev.filter(msg => !msg.isTyping);
+        const errorMessage: Message = {
+          id: `error_${Date.now()}`,
+          role: 'assistant',
+          content: 'I\'m having trouble connecting right now. Please try again later or contact support if the issue persists.',
+          timestamp: new Date(),
+        };
+        return [...withoutTyping, errorMessage];
+      });
+
       setTimeout(scrollToBottom, 50);
     } finally {
       setIsLoading(false);
@@ -199,6 +226,18 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
 
   const handleQuickAction = async (action: string, params?: any) => {
     setIsLoading(true);
+
+    // Add typing indicator for quick actions too
+    const typingMessage: Message = {
+      id: `typing_${Date.now()}`,
+      role: 'assistant',
+      content: 'thinking...',
+      timestamp: new Date(),
+      isTyping: true
+    };
+
+    setMessages(prev => [...prev, typingMessage]);
+    setTimeout(scrollToBottom, 50);
 
     try {
       const response = await fetch('/api/watson/assistant', {
@@ -209,6 +248,14 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
         body: JSON.stringify({
           action,
           userId: 'current_user',
+          context: {
+            ...conversationContext,
+            session_id: sessionId,
+            user_context: {
+              current_system: 'sys_001',
+              user_role: 'manager'
+            }
+          },
           ...params
         }),
       });
@@ -216,19 +263,30 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
       const result = await response.json();
       
       if (result.success && result.data.output?.generic) {
-        const assistantMessage: Message = {
-          id: `assistant_${Date.now()}`,
-          role: 'assistant',
-          content: result.data.output.generic[0]?.text || 'Action completed successfully.',
-          timestamp: new Date(),
-          context: result.data.context
-        };
+        // Remove typing indicator and add real response
+        setMessages(prev => {
+          const withoutTyping = prev.filter(msg => !msg.isTyping);
+          const assistantMessage: Message = {
+            id: `assistant_${Date.now()}`,
+            role: 'assistant',
+            content: result.data.output.generic[0]?.text || 'Action completed successfully.',
+            timestamp: new Date(),
+            context: result.data.context
+          };
+          return [...withoutTyping, assistantMessage];
+        });
 
-        setMessages(prev => [...prev, assistantMessage]);
+        // Update conversation context for next message
+        if (result.data.context) {
+          setConversationContext(result.data.context);
+        }
+
         setTimeout(scrollToBottom, 50);
       }
     } catch (error) {
       console.error('Error executing quick action:', error);
+      // Remove typing indicator on error
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
     } finally {
       setIsLoading(false);
     }
@@ -383,7 +441,15 @@ export function WatsonAssistantChat({ onClose }: WatsonAssistantChatProps) {
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {message.isTyping ? (
+                          <div className="flex gap-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          </div>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
                         <p
                           className={`text-xs mt-1 ${
                             message.role === 'user' ? 'text-blue-100' : 'text-gray-500'

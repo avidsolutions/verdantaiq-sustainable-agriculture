@@ -194,45 +194,52 @@ class WatsonAssistantService {
     const lowerMessage = message.toLowerCase();
     const previousTopic = context?.topic;
     const conversationCount = context?.conversation_count || 0;
+    const userMood = this.detectUserMood(message);
+    const timeOfDay = this.getTimeOfDay();
+    const conversationFlow = this.getConversationFlow(context);
 
     // Temperature-related queries
-    if (lowerMessage.includes('temperature') || lowerMessage.includes('heat')) {
-      const tempResponses = [
-        'Based on your current system data, I recommend maintaining temperatures between 65-75°F for optimal vermiculture production. Your temperature readings look good! Consider adding thermal mass if you experience fluctuations.',
-        'Temperature management is crucial for worm health. Current readings suggest your system is performing well. For winter months, consider insulation or heating elements to maintain consistency.',
-        'I see you\'re monitoring temperature - excellent! The ideal range is 65-75°F. If you notice temperatures dropping below 60°F, worm activity will slow significantly. Would you like specific heating recommendations?',
-        'Your temperature data indicates healthy conditions. Pro tip: Worms are most active at 70-72°F. If you\'re seeing temperatures above 80°F, increase ventilation immediately to prevent stress.'
-      ];
+    if (lowerMessage.includes('temperature') || lowerMessage.includes('heat') || lowerMessage.includes('temp') || lowerMessage.includes('cold')) {
+      const dynamicResponse = this.generateDynamicTemperatureResponse(conversationCount, userMood, timeOfDay, previousTopic);
 
       return {
         output: {
           generic: [{
             response_type: 'text',
-            text: tempResponses[conversationCount % tempResponses.length]
+            text: dynamicResponse
           }]
         },
-        context: { ...context, topic: 'temperature_management', conversation_count: conversationCount + 1 },
+        context: {
+          ...context,
+          topic: 'temperature_management',
+          conversation_count: conversationCount + 1,
+          user_mood: userMood,
+          conversation_flow: conversationFlow,
+          last_interaction: new Date().toISOString()
+        },
         sessionId: 'mock_session'
       };
     }
 
     // Moisture and humidity queries
-    if (lowerMessage.includes('moisture') || lowerMessage.includes('humidity') || lowerMessage.includes('water')) {
-      const moistureResponses = [
-        'Moisture levels should be maintained between 60-70% for optimal worm activity. Think "wrung-out sponge" consistency. Too dry? Increase watering frequency. Too wet? Add dry bedding materials.',
-        'Great question about moisture! Your system should feel like a damp sponge when squeezed. If water drips out, it\'s too wet. If it feels dry, gradually increase moisture with a spray bottle.',
-        'Moisture management is key to success. I recommend checking moisture daily by the "squeeze test" - grab a handful of bedding and squeeze. One or two drops of water should come out, no more.',
-        'Humidity levels look important to you - smart thinking! Worms breathe through their skin, so proper moisture is vital. Aim for 75-85% humidity in the bin environment.'
-      ];
+    if (lowerMessage.includes('moisture') || lowerMessage.includes('humidity') || lowerMessage.includes('water') || lowerMessage.includes('wet') || lowerMessage.includes('dry')) {
+      const dynamicResponse = this.generateDynamicMoistureResponse(conversationCount, userMood, timeOfDay, previousTopic);
 
       return {
         output: {
           generic: [{
             response_type: 'text',
-            text: moistureResponses[conversationCount % moistureResponses.length]
+            text: dynamicResponse
           }]
         },
-        context: { ...context, topic: 'moisture_control', conversation_count: conversationCount + 1 },
+        context: {
+          ...context,
+          topic: 'moisture_control',
+          conversation_count: conversationCount + 1,
+          user_mood: userMood,
+          conversation_flow: conversationFlow,
+          last_interaction: new Date().toISOString()
+        },
         sessionId: 'mock_session'
       };
     }
@@ -342,25 +349,185 @@ class WatsonAssistantService {
       };
     }
 
-    // General responses with variety
-    const generalResponses = [
-      'Welcome to your AI agricultural assistant! I specialize in vermiculture and sustainable farming practices. I can help with temperature control, moisture management, pH balancing, harvest timing, feeding strategies, and troubleshooting. What would you like to explore?',
-      'I\'m here to optimize your agricultural systems! My expertise covers environmental monitoring, system maintenance, production optimization, and problem-solving. Whether you\'re dealing with vermiculture, hydroponics, or traditional farming, I\'m ready to assist.',
-      'Great to connect with you! I can provide guidance on: 🌡️ Environmental controls, 💧 Moisture management, 🔬 pH optimization, 🌱 Growth strategies, 🔧 Maintenance schedules, and 📊 Performance analysis. What\'s your priority today?',
-      'Your agricultural success is my mission! I offer insights on system optimization, environmental management, harvest planning, and sustainable practices. From troubleshooting issues to maximizing yields, I\'m here to help. What can we work on together?',
-      'Hello! I\'m your intelligent farming companion. I can assist with real-time monitoring, predictive analytics, maintenance scheduling, and optimization strategies. Whether you\'re a beginner or expert, I\'ll provide tailored guidance. What aspect interests you most?'
-    ];
+    // General responses with dynamic personality
+    const dynamicResponse = this.generateDynamicGeneralResponse(conversationCount, userMood, timeOfDay, previousTopic);
 
     return {
       output: {
         generic: [{
           response_type: 'text',
-          text: generalResponses[conversationCount % generalResponses.length]
+          text: dynamicResponse
         }]
       },
-      context: { ...context, topic: 'general_assistance', conversation_count: conversationCount + 1 },
+      context: {
+        ...context,
+        topic: 'general_assistance',
+        conversation_count: conversationCount + 1,
+        user_mood: userMood,
+        conversation_flow: conversationFlow,
+        last_interaction: new Date().toISOString()
+      },
       sessionId: 'mock_session'
     };
+  }
+
+  // Helper methods for dynamic conversation
+  private detectUserMood(message: string): 'excited' | 'concerned' | 'frustrated' | 'curious' | 'neutral' {
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('help') || lowerMessage.includes('problem') || lowerMessage.includes('wrong') || lowerMessage.includes('issue')) {
+      return 'concerned';
+    }
+    if (lowerMessage.includes('!') || lowerMessage.includes('great') || lowerMessage.includes('awesome') || lowerMessage.includes('amazing')) {
+      return 'excited';
+    }
+    if (lowerMessage.includes('why') || lowerMessage.includes('how') || lowerMessage.includes('what') || lowerMessage.includes('?')) {
+      return 'curious';
+    }
+    if (lowerMessage.includes('not working') || lowerMessage.includes('failed') || lowerMessage.includes('broken')) {
+      return 'frustrated';
+    }
+    return 'neutral';
+  }
+
+  private getTimeOfDay(): 'morning' | 'afternoon' | 'evening' | 'night' {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 17) return 'afternoon';
+    if (hour >= 17 && hour < 21) return 'evening';
+    return 'night';
+  }
+
+  private getConversationFlow(context?: any): 'opening' | 'continuing' | 'deep_dive' | 'wrapping_up' {
+    const count = context?.conversation_count || 0;
+    if (count === 0) return 'opening';
+    if (count < 3) return 'continuing';
+    if (count < 6) return 'deep_dive';
+    return 'wrapping_up';
+  }
+
+  private generateDynamicTemperatureResponse(count: number, mood: string, timeOfDay: string, previousTopic?: string): string {
+    const greetings = {
+      morning: "Good morning! ",
+      afternoon: "Good afternoon! ",
+      evening: "Good evening! ",
+      night: "Working late, I see! "
+    };
+
+    const moodResponses = {
+      excited: "I love your enthusiasm about temperature monitoring! ",
+      concerned: "I understand your temperature concerns - let's sort this out together. ",
+      frustrated: "Temperature issues can be frustrating, but we'll get this fixed. ",
+      curious: "Great question about temperature! ",
+      neutral: ""
+    };
+
+    const baseResponses = [
+      "Temperature is the foundation of a healthy vermiculture system. The sweet spot is 65-75°F - think of it as creating a cozy environment where your worms can thrive.",
+      "I've been analyzing temperature patterns, and consistency is key. Worms are like us - they don't like sudden temperature swings. Gradual changes are much better.",
+      "Here's a pro tip: worms are most active at 70-72°F. At this temperature, they'll process food faster and reproduce more efficiently.",
+      "Temperature management is an art! If you're seeing readings above 80°F, your worms are getting stressed. Time for some ventilation or shade.",
+      "Winter temperature challenges? I recommend insulation around your bins or even a small heating element for consistent warmth.",
+      "Your temperature monitoring shows you're serious about this! Small fluctuations are normal, but watch for trends over time."
+    ];
+
+    const followUps = [
+      " What specific temperature readings are you seeing?",
+      " Would you like some heating or cooling strategies?",
+      " Are you noticing any changes in worm activity?",
+      " Have you considered thermal mass to stabilize temperatures?",
+      " Let me know if you need troubleshooting help!",
+      " Want to dive deeper into temperature optimization?"
+    ];
+
+    const greeting = greetings[timeOfDay] || "";
+    const moodResponse = moodResponses[mood] || "";
+    const baseResponse = baseResponses[count % baseResponses.length];
+    const followUp = followUps[count % followUps.length];
+
+    return `${greeting}${moodResponse}${baseResponse}${followUp}`;
+  }
+
+  private generateDynamicMoistureResponse(count: number, mood: string, timeOfDay: string, previousTopic?: string): string {
+    const greetings = {
+      morning: "Morning! ",
+      afternoon: "Afternoon! ",
+      evening: "Evening! ",
+      night: "Still working on your system? "
+    };
+
+    const moodResponses = {
+      excited: "I can tell you're passionate about moisture management! ",
+      concerned: "Moisture issues can be tricky, but we'll figure this out. ",
+      frustrated: "I know moisture problems are annoying - let's solve this step by step. ",
+      curious: "Excellent question about moisture! ",
+      neutral: ""
+    };
+
+    const baseResponses = [
+      "Moisture is like the heartbeat of your vermiculture system. Think 'wrung-out sponge' - damp but not dripping. Your worms breathe through their skin, so they need that perfect humidity.",
+      "The squeeze test is your best friend! Grab a handful of bedding and squeeze. You should get 1-2 drops of water, no more. Too dry? Mist lightly. Too wet? Add dry bedding.",
+      "Here's what I've learned from monitoring thousands of systems: 75-85% humidity is the sweet spot. Your worms will be most active and productive in this range.",
+      "Moisture management is all about balance. Too wet and you get anaerobic conditions (smelly!). Too dry and your worms become sluggish and stressed.",
+      "Pro tip: Check moisture daily, but adjust gradually. Sudden changes shock the system. Small, consistent adjustments work best.",
+      "Your attention to moisture shows you understand the fundamentals! Consistent moisture leads to consistent results."
+    ];
+
+    const followUps = [
+      " How does your bedding feel when you squeeze it?",
+      " Are you seeing any signs of over or under-watering?",
+      " Want some tips for maintaining consistent moisture?",
+      " Have you tried the squeeze test recently?",
+      " Need help troubleshooting moisture issues?",
+      " Ready to dive deeper into humidity optimization?"
+    ];
+
+    const greeting = greetings[timeOfDay] || "";
+    const moodResponse = moodResponses[mood] || "";
+    const baseResponse = baseResponses[count % baseResponses.length];
+    const followUp = followUps[count % followUps.length];
+
+    return `${greeting}${moodResponse}${baseResponse}${followUp}`;
+  }
+
+  private generateDynamicGeneralResponse(count: number, mood: string, timeOfDay: string, previousTopic?: string): string {
+    const personalizedGreetings = [
+      `${timeOfDay === 'morning' ? 'Good morning' : timeOfDay === 'afternoon' ? 'Good afternoon' : timeOfDay === 'evening' ? 'Good evening' : 'Hello there'}! I'm your agricultural AI assistant, and I'm here to help you succeed.`,
+      `Hey there! I'm excited to help you with your vermiculture journey. What's on your mind today?`,
+      `Welcome back! I love helping farmers and growers optimize their systems. What can we work on together?`,
+      `Hi! I'm your AI farming companion, ready to dive into whatever agricultural challenge you're facing.`
+    ];
+
+    const moodAdjustments = {
+      excited: " I can feel your enthusiasm - that's the spirit that leads to great harvests!",
+      concerned: " I'm here to help you work through any challenges you're facing.",
+      frustrated: " I understand things can be challenging sometimes. Let's tackle this together.",
+      curious: " I love curious minds - that's how we learn and improve!",
+      neutral: " I'm here and ready to help with whatever you need."
+    };
+
+    const contextualOffers = [
+      " Whether it's temperature, moisture, feeding schedules, or troubleshooting, I've got you covered.",
+      " I can help with everything from basic setup to advanced optimization techniques.",
+      " From pest management to harvest timing, I'm here to guide you through it all.",
+      " Whether you're a beginner or experienced, I can provide insights tailored to your level.",
+      " I have access to the latest agricultural research and best practices to help you succeed."
+    ];
+
+    const callsToAction = [
+      " What specific aspect of your system would you like to explore?",
+      " What's your biggest challenge right now?",
+      " How can I help you improve your agricultural operation today?",
+      " What questions do you have about your current setup?",
+      " Ready to optimize something specific in your system?"
+    ];
+
+    const greeting = personalizedGreetings[count % personalizedGreetings.length];
+    const moodAdjustment = moodAdjustments[mood] || "";
+    const offer = contextualOffers[count % contextualOffers.length];
+    const cta = callsToAction[count % callsToAction.length];
+
+    return `${greeting}${moodAdjustment}${offer}${cta}`;
   }
 }
 
