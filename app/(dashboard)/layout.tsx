@@ -3,21 +3,23 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  LayoutDashboard, 
-  Activity, 
-  BarChart3, 
-  Settings, 
-  Users, 
+import {
+  LayoutDashboard,
+  Activity,
+  BarChart3,
+  Settings,
+  Users,
   Bell,
   LogOut,
   Menu,
   X,
   Bot,
-  Zap
+  Zap,
+  Brain
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -27,14 +29,17 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { data: session } = useSession() || {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, current: true },
-    { name: 'Environmental', href: '/dashboard/environmental', icon: Activity, current: false },
-    { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, current: false },
-    { name: 'Watson AI', href: '/dashboard/watson', icon: Bot, current: false },
-    { name: 'Workflows', href: '/dashboard/workflows', icon: Zap, current: false },
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings, current: false },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Environmental', href: '/environmental', icon: Activity },
+    { name: 'Production', href: '/production', icon: BarChart3 },
+    { name: 'Performance', href: '/performance', icon: Settings },
+    { name: 'AI/ML', href: '/ai-ml', icon: Bot },
+    { name: 'Agentic AI', href: '/dashboard/ai', icon: Brain },
+    { name: 'Alerts', href: '/alerts', icon: Bell },
+    { name: 'Users', href: '/users', icon: Users },
   ];
 
   return (
@@ -79,21 +84,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="flex-1 px-2 py-4 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={`
                   group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors
-                  ${item.current 
-                    ? 'bg-blue-100 text-blue-900' 
+                  ${isActive
+                    ? 'bg-blue-100 text-blue-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }
                 `}
               >
                 <Icon className={`
                   mr-3 flex-shrink-0 h-5 w-5
-                  ${item.current ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}
+                  ${isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}
                 `} />
                 {item.name}
               </Link>
