@@ -19,7 +19,9 @@ import {
   X,
   Bot,
   Zap,
-  Brain
+  Brain,
+  Bug,
+  BookOpen
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -36,8 +38,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'Environmental', href: '/environmental', icon: Activity },
     { name: 'Production', href: '/production', icon: BarChart3 },
     { name: 'Performance', href: '/performance', icon: Settings },
+    { name: 'Vermiculture', href: '/vermiculture', icon: Bug },
     { name: 'AI/ML', href: '/ai-ml', icon: Bot },
-    { name: 'Agentic AI', href: '/dashboard/ai', icon: Brain },
+    { name: 'Training', href: '/training', icon: BookOpen },
     { name: 'Alerts', href: '/alerts', icon: Bell },
     { name: 'Users', href: '/users', icon: Users },
   ];
