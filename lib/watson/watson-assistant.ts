@@ -198,6 +198,11 @@ class WatsonAssistantService {
     const timeOfDay = this.getTimeOfDay();
     const conversationFlow = this.getConversationFlow(context);
 
+    // Check for specific agricultural questions first
+    if (this.isSpecificAgriculturalQuestion(lowerMessage)) {
+      return this.handleSpecificAgriculturalQuestion(lowerMessage, context, conversationCount, userMood, timeOfDay);
+    }
+
     // Temperature-related queries
     if (lowerMessage.includes('temperature') || lowerMessage.includes('heat') || lowerMessage.includes('temp') || lowerMessage.includes('cold')) {
       const dynamicResponse = this.generateDynamicTemperatureResponse(conversationCount, userMood, timeOfDay, previousTopic);
@@ -350,25 +355,7 @@ class WatsonAssistantService {
     }
 
     // General responses with dynamic personality
-    const dynamicResponse = this.generateDynamicGeneralResponse(conversationCount, userMood, timeOfDay, previousTopic);
-
-    return {
-      output: {
-        generic: [{
-          response_type: 'text',
-          text: dynamicResponse
-        }]
-      },
-      context: {
-        ...context,
-        topic: 'general_assistance',
-        conversation_count: conversationCount + 1,
-        user_mood: userMood,
-        conversation_flow: conversationFlow,
-        last_interaction: new Date().toISOString()
-      },
-      sessionId: 'mock_session'
-    };
+    return this.generateTopicBasedResponse(message, context, conversationCount, userMood, timeOfDay);
   }
 
   // Helper methods for dynamic conversation
@@ -490,7 +477,88 @@ class WatsonAssistantService {
     return `${greeting}${moodResponse}${baseResponse}${followUp}`;
   }
 
-  private generateDynamicGeneralResponse(count: number, mood: string, timeOfDay: string, previousTopic?: string): string {
+  private isSpecificAgriculturalQuestion(message: string): boolean {
+    const agriculturalKeywords = [
+      'worm', 'worms', 'vermiculture', 'compost', 'composting', 'bin', 'bedding',
+      'harvest', 'yield', 'production', 'feeding', 'food', 'scraps', 'nutrition',
+      'temperature', 'moisture', 'humidity', 'ph', 'acidity', 'alkaline',
+      'maintenance', 'repair', 'clean', 'problem', 'issue', 'troubleshoot',
+      'optimize', 'efficiency', 'performance', 'system', 'monitor', 'sensor',
+      'alert', 'notification', 'schedule', 'timing', 'frequency'
+    ];
+
+    return agriculturalKeywords.some(keyword => message.includes(keyword));
+  }
+
+  private handleSpecificAgriculturalQuestion(message: string, context: any, count: number, mood: string, timeOfDay: string) {
+    // System status questions
+    if (message.includes('status') || message.includes('how') && (message.includes('system') || message.includes('doing'))) {
+      const statusResponses = [
+        "Your agricultural systems are performing well! Zone A1 is at optimal temperature (72.5°F), Zone A2 is running efficiently at 74.1°F. All moisture levels are within the ideal range of 75-85%. Your worms are active and healthy!",
+        "System status looks great! I'm monitoring 3 active zones with excellent environmental conditions. Zone B1 needs a bit of attention - temperature is slightly high at 78°F, but still manageable. Overall efficiency is at 88.7%.",
+        "Everything's running smoothly! Your vermiculture systems are maintaining optimal conditions. I've detected some minor fluctuations in Zone A2's moisture levels, but they're self-correcting. Production is on track for this month's targets.",
+        "Current system health: Excellent! All zones are operating within optimal parameters. Your proactive monitoring is paying off - I haven't detected any critical issues. The worms are thriving in these conditions!"
+      ];
+
+      return {
+        output: {
+          generic: [{
+            response_type: 'text',
+            text: statusResponses[count % statusResponses.length]
+          }]
+        },
+        context: { ...context, topic: 'system_status', conversation_count: count + 1 },
+        sessionId: 'mock_session'
+      };
+    }
+
+    // Worm-specific questions
+    if (message.includes('worm') || message.includes('worms')) {
+      const wormResponses = [
+        "Your worms are the heart of the operation! Red wigglers (Eisenia fetida) are ideal for vermiculture - they reproduce quickly, process food efficiently, and tolerate handling well. They're most active at 70-75°F and love a balanced diet.",
+        "Worm health indicators to watch: Active movement, consistent feeding behavior, and regular reproduction. Healthy worms should be reddish-brown, moist (not slimy), and responsive to light. If they're sluggish, check temperature and moisture levels.",
+        "Fun worm facts: A single red wiggler can process its own body weight in organic matter daily! They also reproduce rapidly - under ideal conditions, your population can double every 3 months. That's why consistent care pays off exponentially.",
+        "Worm behavior tells you everything about system health. Active worms near the surface indicate good conditions. Worms clustering at the bottom suggest stress - usually from temperature, moisture, or pH imbalances. What behavior are you observing?"
+      ];
+
+      return {
+        output: {
+          generic: [{
+            response_type: 'text',
+            text: wormResponses[count % wormResponses.length]
+          }]
+        },
+        context: { ...context, topic: 'worm_management', conversation_count: count + 1 },
+        sessionId: 'mock_session'
+      };
+    }
+
+    // Production and efficiency questions
+    if (message.includes('production') || message.includes('efficiency') || message.includes('yield')) {
+      const productionResponses = [
+        "Your production metrics are impressive! Current yield efficiency is 88.7% across all zones. Zone A1 is your top performer at 89.2 lbs this month. With consistent care, you could increase overall production by 15-20% over the next quarter.",
+        "Production optimization tip: Your current 157 lbs yield from the R&D zone shows great potential. Focus on maintaining consistent moisture (75-85%) and temperature (70-75°F) to maximize decomposition rates and worm activity.",
+        "Efficiency analysis: You're processing organic waste at an excellent rate! The key to higher yields is feeding consistency - small, frequent feedings work better than large, infrequent ones. Your worms will reward you with faster processing.",
+        "Production forecast: Based on current trends, you're on track to exceed monthly targets by 12%. The combination of optimal environmental conditions and your feeding schedule is creating ideal production conditions."
+      ];
+
+      return {
+        output: {
+          generic: [{
+            response_type: 'text',
+            text: productionResponses[count % productionResponses.length]
+          }]
+        },
+        context: { ...context, topic: 'production_optimization', conversation_count: count + 1 },
+        sessionId: 'mock_session'
+      };
+    }
+
+    // Fall back to existing topic-based responses
+    return this.generateTopicBasedResponse(message, context, count, mood, timeOfDay);
+  }
+
+  private generateTopicBasedResponse(message: string, context: any, count: number, mood: string, timeOfDay: string) {
     const personalizedGreetings = [
       `${timeOfDay === 'morning' ? 'Good morning' : timeOfDay === 'afternoon' ? 'Good afternoon' : timeOfDay === 'evening' ? 'Good evening' : 'Hello there'}! I'm your agricultural AI assistant, and I'm here to help you succeed.`,
       `Hey there! I'm excited to help you with your vermiculture journey. What's on your mind today?`,
@@ -527,7 +595,24 @@ class WatsonAssistantService {
     const offer = contextualOffers[count % contextualOffers.length];
     const cta = callsToAction[count % callsToAction.length];
 
-    return `${greeting}${moodAdjustment}${offer}${cta}`;
+    const responseText = `${greeting}${moodAdjustment}${offer}${cta}`;
+
+    return {
+      output: {
+        generic: [{
+          response_type: 'text',
+          text: responseText
+        }]
+      },
+      context: {
+        ...context,
+        topic: 'general_assistance',
+        conversation_count: count + 1,
+        user_mood: mood,
+        last_interaction: new Date().toISOString()
+      },
+      sessionId: 'mock_session'
+    };
   }
 }
 
