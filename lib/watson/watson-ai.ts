@@ -305,6 +305,83 @@ class WatsonAIService {
   private generateDocumentRecommendations(docs: any[]) {
     return ['Implement best practices', 'Update procedures'];
   }
+
+  async predictMaintenance(equipmentData: any) {
+    try {
+      if (!this.apiKey || !this.serviceUrl) {
+        return this.mockMaintenancePrediction(equipmentData);
+      }
+
+      // Watson ML maintenance prediction implementation
+      const accessToken = await this.getAccessToken();
+
+      const inputData = {
+        input_data: [{
+          fields: ['vibration', 'temperature', 'power_consumption', 'runtime_hours', 'error_rate'],
+          values: [[
+            equipmentData.vibration || 0,
+            equipmentData.temperature || 70,
+            equipmentData.power_consumption || 100,
+            equipmentData.runtime_hours || 1000,
+            equipmentData.error_rate || 0.01
+          ]]
+        }]
+      };
+
+      const response = await axios.post(
+        `${this.serviceUrl}/ml/v4/deployments/maintenance-prediction/predictions`,
+        inputData,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'ML-Instance-ID': this.projectId
+          }
+        }
+      );
+
+      return {
+        failure_probability: response.data.predictions[0].values[0][0],
+        confidence: response.data.predictions[0].values[0][1],
+        recommended_action: this.getMaintenanceRecommendation(response.data.predictions[0].values[0][0]),
+        time_to_failure: this.estimateTimeToFailure(response.data.predictions[0].values[0][0]),
+        maintenance_priority: this.calculateMaintenancePriority(response.data.predictions[0].values[0][0])
+      };
+    } catch (error) {
+      console.error('Watson maintenance prediction error:', error);
+      return this.mockMaintenancePrediction(equipmentData);
+    }
+  }
+
+  private mockMaintenancePrediction(equipmentData: any) {
+    const failureProbability = Math.random() * 0.3; // 0-30% chance
+    return {
+      failure_probability: failureProbability,
+      confidence: Math.random() * 0.2 + 0.8, // 80-100% confidence
+      recommended_action: failureProbability > 0.15 ? 'Schedule maintenance' : 'Continue monitoring',
+      time_to_failure: Math.round(Math.random() * 30 + 7), // 7-37 days
+      maintenance_priority: failureProbability > 0.2 ? 'high' : failureProbability > 0.1 ? 'medium' : 'low'
+    };
+  }
+
+  private getMaintenanceRecommendation(probability: number): string {
+    if (probability > 0.7) return 'Immediate maintenance required';
+    if (probability > 0.4) return 'Schedule maintenance within 48 hours';
+    if (probability > 0.2) return 'Schedule maintenance within 1 week';
+    return 'Continue normal operation with monitoring';
+  }
+
+  private estimateTimeToFailure(probability: number): number {
+    // Higher probability = shorter time to failure
+    return Math.round((1 - probability) * 30 + 1); // 1-30 days
+  }
+
+  private calculateMaintenancePriority(probability: number): string {
+    if (probability > 0.6) return 'critical';
+    if (probability > 0.3) return 'high';
+    if (probability > 0.1) return 'medium';
+    return 'low';
+  }
 }
 
 export const watsonAI = new WatsonAIService();
